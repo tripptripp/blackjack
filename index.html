@@ -47,7 +47,7 @@
 </head>
 <body>
 
-<h1>Blackjack Game</h1>
+<h1>Tripps Skibidi Blackjack Game</h1>
 <div id="gameArea">
     <div id="dealerArea"></div>
     <div id="playerArea"></div>
@@ -72,6 +72,7 @@
     }
 
     let deck, playerHand, dealerHand;
+    let dealerHidden = true; // Flag to indicate if the dealer's hole card is hidden
     const dealerArea = document.getElementById('dealerArea');
     const playerArea = document.getElementById('playerArea');
     const resultDiv = document.getElementById('result');
@@ -92,6 +93,7 @@
         deck = createDeck();
         playerHand = [deck.pop(), deck.pop()];
         dealerHand = [deck.pop(), deck.pop()];
+        dealerHidden = true; // Reset dealer hidden flag
         renderGame();
         resultDiv.textContent = '';
         
@@ -103,7 +105,16 @@
     function renderGame() {
         dealerArea.innerHTML = '';
         playerArea.innerHTML = '';
-        dealerHand.forEach(card => dealerArea.innerHTML += `<div class="card">${card.value}${card.suit}</div>`);
+
+        // Render dealer's cards, hiding the second card if needed
+        dealerHand.forEach((card, index) => {
+            if (index === 1 && dealerHidden) {
+                dealerArea.innerHTML += `<div class="card">??</div>`; // Hide the second card
+            } else {
+                dealerArea.innerHTML += `<div class="card">${card.value}${card.suit}</div>`;
+            }
+        });
+
         playerHand.forEach(card => playerArea.innerHTML += `<div class="card">${card.value}${card.suit}</div>`);
     }
 
@@ -131,6 +142,8 @@
         playerHand.push(deck.pop());
         if (calculateScore(playerHand) > 21) {
             resultDiv.textContent = 'You bust! Dealer wins!';
+            dealerHidden = false; // Reveal dealer's card since player busts
+            renderGame();
             document.getElementById('hitBtn').disabled = true;
             document.getElementById('standBtn').disabled = true;
         }
@@ -138,6 +151,9 @@
     }
 
     function stand() {
+        dealerHidden = false; // Reveal the dealer's hidden card
+        renderGame(); // Update the display to show the dealer's card
+
         while (calculateScore(dealerHand) < 17) {
             dealerHand.push(deck.pop());
         }
