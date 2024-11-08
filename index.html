@@ -29,8 +29,12 @@
             margin: 10px; /* Space between each hand */
             display: flex; /* Use flexbox for horizontal layout */
             justify-content: center; /* Center the hands */
+            border: 2px solid transparent; /* Default border */
+            transition: border-color 0.3s ease; /* Smooth border transition */
         }
-
+        .active-hand {
+            border-color: yellow; /* Highlight color for the active hand */
+        }
         .player-hands-container {
             display: flex; /* Flexbox for containing both hands */
             justify-content: center; /* Center the hands in the container */
@@ -95,6 +99,7 @@
     const playerArea = document.getElementById('playerArea');
     const resultDiv = document.getElementById('result');
     let currentHandIndex = 0; // Track which hand is currently being played
+    let handResults = []; // Array to store results of each hand
 
     function createDeck() {
         const suits = ['♥', '♦', '♣', '♠'];
@@ -116,7 +121,9 @@
         renderGame();
         resultDiv.textContent = '';
         currentHandIndex = 0; // Reset hand index
+        handResults = []; // Clear previous hand results
         enableButtons(true);
+        checkForBlackjack(); // Check for Blackjack after initial deal
     }
 
     function enableButtons(enabled) {
@@ -126,6 +133,27 @@
         document.getElementById('splitBtn').disabled = !enabled;
     }
 
+    function checkForBlackjack() {
+        const playerScore = calculateScore(playerHands[0]);
+        const dealerScore = calculateScore(dealerHand);
+
+        // Check if player has a Blackjack
+        if (playerHands[0].length === 2 && playerScore === 21) {
+            if (dealerScore === 21) {
+                endGame("It's a tie! Both have Blackjack.");
+            } else {
+                endGame("You have a Blackjack! You win!");
+            }
+            return;
+        }
+
+        // Check if dealer has a Blackjack
+        if (dealerHand.length === 2 && dealerScore === 21) {
+            endGame("Dealer has a Blackjack! Dealer wins.");
+            return;
+        }
+    }
+
     function doubleDown(handIndex) {
         enableButtons(false);
         playerHands[handIndex].push(deck.pop());
@@ -133,7 +161,18 @@
 
         // Check if the player busts after doubling down
         if (calculateScore(playerHands[handIndex]) > 21) {
-            endGame('You bust! Dealer wins!'); // End the game if bust
+            // If bust, notify the player but don't end the game immediately
+            handResults[handIndex] = `Hand ${handIndex + 1}: You bust!`;
+            currentHandIndex++; // Move to the next hand
+            if (currentHandIndex < playerHands.length) {
+                renderGame(); // Render the next hand
+                enableButtons(true); // Enable buttons for the next hand
+            } else {
+                // If no more hands, reveal dealer's hand
+                dealerHidden = false;
+                renderGame();
+                endGame(); // Show final results
+            }
         } else {
             // Automatically end the turn after doubling down if not bust
             stand(handIndex);
@@ -183,6 +222,10 @@
         playerHands.forEach((hand, index) => {
             const handDiv = document.createElement('div');
             handDiv.className = 'player-hand'; // Add class for each hand
+            // Highlight the current hand
+            if (index === currentHandIndex) {
+                handDiv.classList.add('active-hand'); // Add active class for current hand
+            }
             hand.forEach(card => {
                 handDiv.innerHTML += `<div class="card">${card.value}${card.suit}</div>`;
             });
@@ -215,10 +258,23 @@
 
     function hit() {
         playerHands[currentHandIndex].push(deck.pop()); // Hit the current hand
-        if (calculateScore(playerHands[currentHandIndex]) > 21) {
-            endGame('You bust! Dealer wins!'); // End game if bust
+        const currentScore = calculateScore(playerHands[currentHandIndex]); // Calculate the current score
+        renderGame(); // Update the display
+
+        if (currentScore > 21) {
+            // If bust, notify the player but don't end the game immediately
+            handResults[currentHandIndex] = `Hand ${currentHandIndex + 1}: You bust!`;
+            currentHandIndex++; // Move to the next hand
+            if (currentHandIndex < playerHands.length) {
+                renderGame(); // Render the next hand
+                enableButtons(true); // Enable buttons for the next hand
+            } else {
+                // If no more hands, reveal dealer's hand
+                dealerHidden = false;
+                renderGame();
+                endGame(); // Show final results
+            }
         }
-        renderGame();
     }
 
     function stand(handIndex) {
@@ -229,8 +285,19 @@
             return; // Exit if all hands are processed
         }
 
-        // Proceed to dealer's turn only if the current hand is finished
-        dealerTurn(handIndex);
+        // Store the result of the current hand
+        const playerScore = calculateScore(playerHands[handIndex]);
+        handResults[handIndex] = `Hand ${handIndex + 1}: You scored ${playerScore}.`;
+
+        // Move to the next hand
+        currentHandIndex++; // Move to the next hand
+        if (currentHandIndex < playerHands.length) {
+            renderGame(); // Render to show the next hand
+            enableButtons(true); // Re-enable buttons for the next hand
+        } else {
+            // Proceed to dealer's turn only if all hands are finished
+            dealerTurn(0); // Start the dealer's turn
+        }
     }
 
     function dealerTurn(handIndex) {
@@ -243,22 +310,25 @@
             }, 1000); // 1000ms delay for each card drawn
         } else {
             // Final scoring after dealer is done drawing
-            const playerScore = calculateScore(playerHands[handIndex]);
-            const finalDealerScore = calculateScore(dealerHand);
-            if (finalDealerScore > 21 || playerScore > finalDealerScore) {
-                endGame(`Hand ${handIndex + 1}: You win!`);
-            } else if (playerScore < finalDealerScore) {
-                endGame(`Hand ${handIndex + 1}: Dealer wins!`);
-            } else {
-                endGame(`Hand ${handIndex + 1}: It's a tie!`);
-            }
-            // Move to the next hand
-            stand(handIndex + 1); // Process the next hand
+            playerHands.forEach((hand, index) => {
+                const playerScore = calculateScore(hand);
+                const finalDealerScore = calculateScore(dealerHand);
+                if (finalDealerScore > 21 || playerScore > finalDealerScore) {
+                    handResults[index] += ` You win!`;
+                } else if (playerScore < finalDealerScore) {
+                    handResults[index] += ` Dealer wins.`;
+                } else {
+                    // Handle a tie situation
+                    handResults[index] += ` It's a tie!`;
+                }
+            });
+            endGame(); // Show final results
         }
     }
 
-    function endGame(message) {
-        resultDiv.textContent = message;
+    function endGame() {
+        // Show results for each hand
+        resultDiv.innerHTML = handResults.join('<br/>'); // Display results for all hands
         dealerHidden = false; // Reveal dealer's card since game is over
         renderGame();
         enableButtons(false); // Disable all buttons when game is over
