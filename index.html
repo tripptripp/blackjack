@@ -52,6 +52,19 @@
             cursor: pointer;
             margin: 5px;
         }
+        .chip {
+            cursor: pointer;
+            margin: 5px;
+            padding: 10px;
+            background-color: #ffffff;
+            color: black;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            display: inline-block;
+        }
+        .chip:hover {
+            background-color: #e0e0e0;
+        }
         @media (max-width: 600px) {
             .card {
                 width: 80px;
@@ -68,16 +81,29 @@
 
 <header>Tripp and Mitchell</header>    
 <h1>Skibidi Blackjack Game</h1>
-<div id="gameArea">
+<div id="gameArea" style="display: none;"> <!-- Initially hidden -->
+    <h3>Your Balance: $<span id="balance">25</span></h3>
+    <h4>Current Wager: $<span id="currentWagerDisplay">0</span></h4> <!-- Display current wager -->
     <div id="dealerArea"></div>
     <div id="playerArea"></div>
+    <div id="controls" style="display: flex; justify-content: center;">
+        <button id="hitBtn">Hit</button>
+        <button id="standBtn">Stand</button>
+        <button id="doubleBtn">Double Down</button>
+        <button id="splitBtn">Split</button>
+        <button id="restartBtn">Restart</button>
+    </div>
 </div>
-<div id="controls">
-    <button id="hitBtn">Hit</button>
-    <button id="standBtn">Stand</button>
-    <button id="doubleBtn">Double Down</button>
-    <button id="splitBtn">Split</button>
-    <button id="restartBtn">Restart</button>
+<div id="bettingArea"> <!-- Betting area -->
+    <h3>Your Balance: $<span id="balance">25</span></h3>
+    <h4>Place Your Bet:</h4>
+    <div id="chipArea">
+        <div class="chip" data-value="1">$1</div>
+        <div class="chip" data-value="5">$5</div>
+        <div class="chip" data-value="20">$20</div>
+    </div>
+    <h4>Current Wager: $<span id="currentWager">0</span></h4>
+    <button id="betBtn">Bet</button>
 </div>
 <div id="result"></div>
 
@@ -99,6 +125,8 @@
     const playerArea = document.getElementById('playerArea');
     const resultDiv = document.getElementById('result');
     let currentHandIndex = 0; // Track which hand is currently being played
+    let balance = 25; // Player's starting balance
+    let currentWager = 0; // Current wager amount
     let handResults = []; // Array to store results of each hand
 
     function createDeck() {
@@ -124,6 +152,11 @@
         handResults = []; // Clear previous hand results
         enableButtons(true);
         checkForBlackjack(); // Check for Blackjack after initial deal
+    }
+
+    function resetWager() {
+        currentWager = 0; // Reset current wager
+        document.getElementById('currentWager').textContent = currentWager; // Update the display
     }
 
     function enableButtons(enabled) {
@@ -154,8 +187,45 @@
         }
     }
 
+    // Chip Betting Logic
+    document.querySelectorAll('.chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const chipValue = parseInt(chip.getAttribute('data-value'));
+            if (currentWager + chipValue <= balance) {
+                currentWager += chipValue; // Add chip value to current wager
+                document.getElementById('currentWager').textContent = currentWager; // Update wager display
+            } else {
+                alert("You don't have enough balance to place that bet!");
+            }
+        });
+    });
+
+    document.getElementById('betBtn').addEventListener('click', () => {
+        if (currentWager > 0) {
+            balance -= currentWager; // Deduct wager from balance
+            document.getElementById('balance').textContent = balance; // Update balance display
+            
+            // Hide the betting area and show the game area
+            document.getElementById('bettingArea').style.display = 'none';
+            document.getElementById('gameArea').style.display = 'block'; // Show the game area
+
+            // Update the display for the wager amount
+            document.getElementById('currentWagerDisplay').textContent = currentWager;
+
+            startGame(); // Start the game and deal cards
+        } else {
+            alert("You must place a wager before the game starts!");
+        }
+    });
+
     function doubleDown(handIndex) {
+        if (currentWager * 2 > balance) { // Check if player can double down
+            alert("You don't have enough balance to double down!");
+            return;
+        }
         enableButtons(false);
+        currentWager *= 2; // Double the wager
+        balance -= currentWager; // Deduct from balance
         playerHands[handIndex].push(deck.pop());
         renderGame(); // Update the display
 
@@ -315,11 +385,14 @@
                 const finalDealerScore = calculateScore(dealerHand);
                 if (finalDealerScore > 21 || playerScore > finalDealerScore) {
                     handResults[index] += ` You win!`;
+                    balance += currentWager * 2; // Player gets back their wager plus winnings
                 } else if (playerScore < finalDealerScore) {
                     handResults[index] += ` Dealer wins.`;
+                    balance -= currentWager; // Subtract wager from balance on loss
                 } else {
                     // Handle a tie situation
                     handResults[index] += ` It's a tie!`;
+                    balance += currentWager; // Wager returned in case of tie
                 }
             });
             endGame(); // Show final results
@@ -332,6 +405,7 @@
         dealerHidden = false; // Reveal dealer's card since game is over
         renderGame();
         enableButtons(false); // Disable all buttons when game is over
+        document.getElementById('balance').textContent = balance; // Update balance display
     }
 
     document.getElementById('hitBtn').addEventListener('click', hit);
